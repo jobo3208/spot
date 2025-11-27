@@ -1,26 +1,21 @@
-(ns spot.core)
+(ns spot.core
+  (:require [spot.ratio :refer [radd rcomp rdiv rmult rquot rrem]]))
 
-(set! *math-context* (java.math.MathContext. 10))
-
-(defn- distribute-total
-  "Distribute total (dollars and cents) as evenly as possible cent-wise
-  according to quotas, which may be of arbitrary precision."
+(defn apportion
+  "Distribute integer total as evenly as possible according to rational quotas."
   [total quotas]
-  (let [total-cents (.longValue (* total 100M))
-        cent-quotas (map #(* % 100M) quotas)
-        lower-quotas (mapv #(.longValue (quot % 1)) cent-quotas)
-        remainders (mapv #(mod % 1) cent-quotas)
-        remaining-cents (- total-cents (reduce + lower-quotas))
+  (let [lower-quotas (mapv rquot quotas)
+        remainders (mapv rrem quotas)
+        remaining (- total (reduce + lower-quotas))
         ; indexes of proportions with highest remainders
         give-remaining-to (->> (range (count quotas))
-                               (sort-by (partial nth remainders))
+                               (sort-by (partial nth remainders) rcomp)
                                (reverse)
-                               (take remaining-cents))
-        final-cents (reduce
-                      #(update %1 %2 inc)
-                      lower-quotas
-                      give-remaining-to)]
-    (mapv #(/ (bigdec %) 100M) final-cents)))
+                               (take remaining))]
+    (reduce
+      #(update %1 %2 inc)
+      lower-quotas
+      give-remaining-to)))
 
 (defmulti split-expense
   "Return split amounts based on :split-method."
@@ -29,8 +24,8 @@
 (defmethod split-expense :equal
   [{:keys [amount participants]}]
   (let [n (count participants)
-        quotas (repeat n (/ (bigdec amount) n))]
-    (distribute-total amount quotas)))
+        quotas (repeat n [amount n])]
+    (apportion amount quotas)))
 
 (defmethod split-expense :by-amount
   [{:keys [split-amounts]}]
@@ -38,23 +33,23 @@
 
 (defmethod split-expense :by-percentage
   [{:keys [amount split-percentages]}]
-  (let [proportions (map #(/ % 100M) split-percentages)
-        quotas (map (partial * amount) proportions)]
-    (distribute-total amount quotas)))
+  (let [proportions (map #(rdiv % 100) split-percentages)
+        quotas (map (partial rmult amount) proportions)]
+    (apportion amount quotas)))
 
 (defmethod split-expense :by-shares
   [{:keys [amount split-shares]}]
-  (let [total-shares (bigdec (reduce + split-shares))
-        proportions (map #(/ % total-shares) split-shares)
-        quotas (map (partial * amount) proportions)]
-    (distribute-total amount quotas)))
+  (let [total-shares (reduce + split-shares)
+        proportions (map #(rdiv % total-shares) split-shares)
+        quotas (map (partial rmult amount) proportions)]
+    (apportion amount quotas)))
 
 (defmethod split-expense :by-adjustment
   [{:keys [amount split-adjustments] :as expense}]
   (let [amount-to-divide (- amount (reduce + split-adjustments))
         amounts (split-expense (assoc expense :amount amount-to-divide :split-method :equal))
-        quotas (map + amounts split-adjustments)]
-    (distribute-total amount quotas)))
+        quotas (map radd amounts split-adjustments)]
+    (apportion amount quotas)))
 
 (defn expense->loans
   [{:keys [payer id participants] :as expense}]

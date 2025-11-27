@@ -2,11 +2,10 @@
   (:require [clojure.test.check.clojure-test :refer [defspec]]
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
-            [spot.core :as core]))
+            [spot.core :as core]
+            [spot.ratio :refer [rdiv]]))
 
-(set! *math-context* (java.math.MathContext. 10))
-
-(def gen-amount (gen/fmap #(/ (inc %) 100M) gen/nat))
+(def gen-amount (gen/fmap inc gen/nat))
 
 (defn n->participants [n]
   (mapv inc (range n)))
@@ -16,8 +15,10 @@
 (def gen-shares (gen/such-that not-empty (gen/vector (gen/fmap inc gen/nat))))
 
 (defn shares->percentages [shares]
-  (let [total-shares (reduce + shares)]
-    (map #(* 100 (/ (bigdec %) total-shares)) shares)))
+  (let [total-shares (reduce + shares)
+        ; apportion is used here to ensure percentages sum to 100
+        percentages (core/apportion 100 (map #(rdiv (* % 100) total-shares) shares))]
+    percentages))
 
 (def gen-percentages (gen/fmap shares->percentages gen-shares))
 
@@ -26,7 +27,7 @@
        (gen/fmap #(* % (rand-nth [-1 1])))
        (gen/vector)
        (gen/such-that not-empty)
-       (gen/fmap #(conj % 0M))))
+       (gen/fmap #(conj % 0))))
 
 (def gen-adjustments-and-amount
   (gen/bind gen-adjustments
@@ -49,7 +50,7 @@
            (or (= (count (distinct amounts)) 1)
                ; ...or two, and they're within a cent of each other
                (and (= (count (distinct amounts)) 2)
-                    (<= (abs (apply - (distinct amounts))) 0.01M)))))))
+                    (<= (abs (apply - (distinct amounts))) 1)))))))
 
 (defspec test-split-by-amount
   200
@@ -69,9 +70,9 @@
                    :split-method :by-percentage
                    :split-percentages percentages}
           amounts (core/split-expense expense)
-          expected-amounts (map #(* total (/ % 100M)) percentages)]
+          expected-amounts (map #(quot (* total %) 100) percentages)]
       (and (= (reduce + amounts) total)
-           (every? #(<= (abs %) 0.01M) (map - amounts expected-amounts))))))
+           (every? #(<= (abs %) 1) (map - amounts expected-amounts))))))
 
 (defspec test-split-by-shares
   200
@@ -81,10 +82,9 @@
                    :split-method :by-shares
                    :split-shares shares}
           amounts (core/split-expense expense)
-          percentages (shares->percentages shares)
-          expected-amounts (map #(* total (/ % 100M)) percentages)]
+          expected-amounts (map #(quot (* total %) (reduce + shares)) shares)]
       (and (= (reduce + amounts) total)
-           (every? #(<= (abs %) 0.01M) (map - amounts expected-amounts))))))
+           (every? #(<= (abs %) 1) (map - amounts expected-amounts))))))
 
 (defspec test-split-by-adjustment
   200
@@ -100,4 +100,4 @@
            (or (= (count (distinct unadjusted-amounts)) 1)
                ; ...or two, and they're within a cent of each other
                (and (= (count (distinct unadjusted-amounts)) 2)
-                    (<= (abs (apply - (distinct unadjusted-amounts))) 0.01M)))))))
+                    (<= (abs (apply - (distinct unadjusted-amounts))) 1)))))))
