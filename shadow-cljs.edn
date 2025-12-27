@@ -1,0 +1,19 @@
+;; shadow-cljs configuration
+{:source-paths
+ ["src" "test"]
+
+ :dependencies
+ [[cider/cider-nrepl "0.58.0"]
+  [metosin/malli "0.20.0"]
+  [reagent "2.0.1"]]
+
+ :nrepl
+ {:port 3333}
+
+ :dev-http
+ {8080 "public"}
+
+ :builds
+ {:frontend
+  {:target :browser
+   :modules {:main {:init-fn spot.cljs/init}}}}}

@@ -1,1 +1,8 @@
 src/repl.clj
+.cpcache
+.shadow-cljs
+NOTES
+TODO
+node_modules
+public/js
+junk
