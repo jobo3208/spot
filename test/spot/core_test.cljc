@@ -36,12 +36,12 @@
               (let [amount (* (count adjs) (reduce + (map abs adjs)))]
                 (gen/tuple (gen/return adjs) (gen/return amount))))))
 
-(defspec test-split-equal
+(defspec test-split-equally
   200
   (prop/for-all [total gen-amount
                  participants gen-participants]
     (let [expense {:amount total
-                   :split-method :equal
+                   :split-method :equally
                    :participants participants}
           amounts (core/split-expense expense)]
       ; amounts sum to total

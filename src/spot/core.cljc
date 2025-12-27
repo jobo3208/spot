@@ -21,7 +21,7 @@
   "Return split amounts based on :split-method."
   :split-method)
 
-(defmethod split-expense :equal
+(defmethod split-expense :equally
   [{:keys [amount participants]}]
   (let [n (count participants)
         quotas (repeat n [amount n])]
@@ -47,7 +47,7 @@
 (defmethod split-expense :by-adjustment
   [{:keys [amount split-adjustments] :as expense}]
   (let [amount-to-divide (- amount (reduce + split-adjustments))
-        amounts (split-expense (assoc expense :amount amount-to-divide :split-method :equal))
+        amounts (split-expense (assoc expense :amount amount-to-divide :split-method :equally))
         quotas (map radd amounts split-adjustments)]
     (apportion amount quotas)))
 
