@@ -28,25 +28,29 @@
     (apportion amount quotas)))
 
 (defmethod split-expense :by-amount
-  [{:keys [split-amounts]}]
-  split-amounts)
+  [{:keys [participants split-params]}]
+  (let [split-amounts (mapv (partial get split-params) participants)]
+    split-amounts))
 
 (defmethod split-expense :by-percentage
-  [{:keys [amount split-percentages]}]
-  (let [proportions (map #(rdiv % 100) split-percentages)
+  [{:keys [amount participants split-params]}]
+  (let [split-percentages (mapv (partial get split-params) participants)
+        proportions (map #(rdiv % 100) split-percentages)
         quotas (map (partial rmult amount) proportions)]
     (apportion amount quotas)))
 
 (defmethod split-expense :by-shares
-  [{:keys [amount split-shares]}]
-  (let [total-shares (reduce + split-shares)
+  [{:keys [amount participants split-params]}]
+  (let [split-shares (mapv (partial get split-params) participants)
+        total-shares (reduce + split-shares)
         proportions (map #(rdiv % total-shares) split-shares)
         quotas (map (partial rmult amount) proportions)]
     (apportion amount quotas)))
 
 (defmethod split-expense :by-adjustment
-  [{:keys [amount split-adjustments] :as expense}]
-  (let [amount-to-divide (- amount (reduce + split-adjustments))
+  [{:keys [amount participants split-params] :as expense}]
+  (let [split-adjustments (mapv (partial get split-params) participants)
+        amount-to-divide (- amount (reduce + split-adjustments))
         amounts (split-expense (assoc expense :amount amount-to-divide :split-method :equally))
         quotas (map radd amounts split-adjustments)]
     (apportion amount quotas)))

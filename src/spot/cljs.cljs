@@ -73,23 +73,14 @@
   (update state :db db/delete-expense id))
 
 (defn update-split-method [state new-split-method]
-  ; TODO - don't hardcode
-  (let [param-keys {:by-amount :split-amounts
-                    :by-percentage :split-percentages
-                    :by-shares :split-shares
-                    :by-adjustment :split-adjustments}
-        data (get-in state [:ui :expense :data])
-        data (reduce dissoc data (vals param-keys))
-        data (assoc data :split-method new-split-method)
-        data (if-let [param-key (param-keys new-split-method)]
-               (assoc data param-key (vec (repeat (count (:participants data)) nil)))
-               data)]
-    (assoc-in state [:ui :expense :data] data)))
+  (-> state
+      (assoc-in [:ui :expense :data :split-method] new-split-method)
+      (update-in [:ui :expense :data] dissoc :split-params)))
 
 (defn update-participants [state new-participants]
   (-> state
       (assoc-in [:ui :expense :data :participants] new-participants)
-      (update-split-method (get-in state [:ui :expense :data :split-method]))))
+      (update-in [:ui :expense :data :split-params] select-keys new-participants)))
 
 (defn summary-card [*state]
   (let [{:keys [db]} @*state
@@ -181,74 +172,33 @@
           "Edit"]])]]))
 
 (defmulti edit-expense-split-method-params
-  (fn [*state {:keys [data errors]}]
+  (fn [_ {:keys [data]}]
     (:split-method data)))
 
 (defmethod edit-expense-split-method-params :equally
-  [*state expense]
+  [_ _]
   nil)
 
-(defmethod edit-expense-split-method-params :by-amount
+(defmethod edit-expense-split-method-params :default
   [*state {:keys [data errors]}]
-  (let [{:keys [db ui]} @*state]
+  (let [{:keys [db]} @*state]
     [:div.mb-2
-     [:label.form-label "Split amounts"]
-     (for [[i id amount] (map vector (range) (:participants data) (:split-amounts data))]
-       [:div.row.mb-1
-        [:label.col-sm-2.col-form-label (get-in db [:people id :name])]
-        [:div.col-sm-10
-         [:input.form-control
-          {:type :text
-           :class (cond-> [] (get-in errors [:split-amounts i]) (conj :is-invalid))
-           :on-change #(swap! *state assoc-in [:ui :expense :data :split-amounts i] (-> % .-target .-value))
-           :value amount}]
-         (when (get-in errors [:split-amounts i])
-           [:div.invalid-feedback (first (get-in errors [:split-amounts i]))])]])]))
-
-(defmethod edit-expense-split-method-params :by-percentage
-  [*state {:keys [data errors]}]
-  (let [{:keys [db ui]} @*state]
-    [:div.mb-2
-     [:label.form-label "Split percentages"]
-     (for [[i id percentage] (map vector (range) (:participants data) (:split-percentages data))]
-       [:div.row.mb-1
-        [:label.col-sm-2.col-form-label (get-in db [:people id :name])]
-        [:div.col-sm-10
-         [:input.form-control
-          {:type :text
-           :on-change #(swap! *state assoc-in [:ui :expense :data :split-percentages i] (-> % .-target .-value))
-           :value percentage}]]])]))
-
-(defmethod edit-expense-split-method-params :by-shares
-  [*state {:keys [data errors]}]
-  (let [{:keys [db ui]} @*state]
-    [:div.mb-2
-     [:label.form-label "Split shares"]
-     (for [[i id shares] (map vector (range) (:participants data) (:split-shares data))]
-       [:div.row.mb-1
-        [:label.col-sm-2.col-form-label (get-in db [:people id :name])]
-        [:div.col-sm-10
-         [:input.form-control
-          {:type :text
-           :on-change #(swap! *state assoc-in [:ui :expense :data :split-shares i] (-> % .-target .-value))
-           :value shares}]]])]))
-
-(defmethod edit-expense-split-method-params :by-adjustment
-  [*state {:keys [data errors]}]
-  (let [{:keys [db ui]} @*state]
-    [:div.mb-2
-     [:label.form-label "Split adjustments"]
-     (for [[i id adjustment] (map vector (range) (:participants data) (:split-adjustments data))]
-       [:div.row.mb-1
-        [:label.col-sm-2.col-form-label (get-in db [:people id :name])]
-        [:div.col-sm-10
-         [:input.form-control
-          {:type :text
-           :on-change #(swap! *state assoc-in [:ui :expense :data :split-adjustments i] (-> % .-target .-value))
-           :value adjustment}]]])]))
+     (for [id (:participants data)]
+       (let [data (get-in data [:split-params id])
+             errors (get-in errors [:split-params id])]
+         [:div.row.mb-1
+          [:label.col-sm-2.col-form-label (get-in db [:people id :name])]
+          [:div.col-sm-10
+           [:input.form-control
+            {:type :text
+             :class (cond-> [] errors (conj :is-invalid))
+             :on-change #(swap! *state assoc-in [:ui :expense :data :split-params id] (-> % .-target .-value))
+             :value data}]
+           (when errors
+             [:div.invalid-feedback (first errors)])]]))]))
 
 (defn edit-expense-card [*state]
-  (let [{:keys [db ui] :as state} @*state
+  (let [{:keys [db ui]} @*state
         {:keys [data errors]} (:expense ui)
         existing-expense (get-in db [:expenses (:id data)])]
     [:div.card.mb-2.border.border-2.border-primary

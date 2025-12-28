@@ -55,9 +55,11 @@
 (defspec test-split-by-amount
   200
   (prop/for-all [amounts (gen/such-that not-empty (gen/vector gen-amount))]
-    (let [expense {:amount (reduce + amounts)
+    (let [participants (n->participants (count amounts))
+          expense {:amount (reduce + amounts)
+                   :participants participants
                    :split-method :by-amount
-                   :split-amounts amounts}
+                   :split-params (zipmap participants amounts)}
           amounts' (core/split-expense expense)]
       ; amounts don't change
       (= amounts amounts'))))
@@ -66,9 +68,11 @@
   200
   (prop/for-all [total gen-amount
                  percentages gen-percentages]
-    (let [expense {:amount total
+    (let [participants (n->participants (count percentages))
+          expense {:amount total
+                   :participants participants
                    :split-method :by-percentage
-                   :split-percentages percentages}
+                   :split-params (zipmap participants percentages)}
           amounts (core/split-expense expense)
           expected-amounts (map #(quot (* total %) 100) percentages)]
       (and (= (reduce + amounts) total)
@@ -78,9 +82,11 @@
   200
   (prop/for-all [total gen-amount
                  shares gen-shares]
-    (let [expense {:amount total
+    (let [participants (n->participants (count shares))
+          expense {:amount total
+                   :participants participants
                    :split-method :by-shares
-                   :split-shares shares}
+                   :split-params (zipmap participants shares)}
           amounts (core/split-expense expense)
           expected-amounts (map #(quot (* total %) (reduce + shares)) shares)]
       (and (= (reduce + amounts) total)
@@ -89,10 +95,11 @@
 (defspec test-split-by-adjustment
   200
   (prop/for-all [[adjustments total] gen-adjustments-and-amount]
-    (let [expense {:amount total
+    (let [participants (n->participants (count adjustments))
+          expense {:amount total
                    :split-method :by-adjustment
-                   :participants (n->participants (count adjustments))
-                   :split-adjustments adjustments}
+                   :participants participants
+                   :split-params (zipmap participants adjustments)}
           amounts (core/split-expense expense)
           unadjusted-amounts (map - amounts adjustments)]
       (and (= (reduce + amounts) total)
