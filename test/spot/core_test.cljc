@@ -1,5 +1,6 @@
 (ns spot.core-test
-  (:require [clojure.test.check.clojure-test :refer [defspec]]
+  (:require [clojure.test :refer [deftest is testing]]
+            [clojure.test.check.clojure-test :refer [defspec]]
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
             [spot.core :as core]
@@ -108,3 +109,37 @@
                ; ...or two, and they're within a cent of each other
                (and (= (count (distinct unadjusted-amounts)) 2)
                     (<= (abs (apply - (distinct unadjusted-amounts))) 1)))))))
+
+(deftest test-all-split-methods-degenerate-into-equally
+  (doseq [method [:equally :by-amount :by-percentage :by-shares :by-adjustment]]
+    (is (= (core/split-expense {:split-method method :amount 100 :participants [1 2 3 4]}) [25 25 25 25]))))
+
+(deftest test-partial-params
+  (testing "by amount"
+    (is (= (core/split-expense
+             {:split-method :by-amount
+              :amount 100
+              :participants [1 2 3]
+              :split-params {1 72}})
+           [72 14 14])))
+  (testing "by percentage"
+    (is (= (core/split-expense
+             {:split-method :by-percentage
+              :amount 100
+              :participants [1 2 3]
+              :split-params {2 60}})
+           [20 60 20])))
+  (testing "by shares"
+    (is (= (core/split-expense
+             {:split-method :by-shares
+              :amount 100
+              :participants [1 2 3]
+              :split-params {3 2}})
+           [25 25 50])))
+  (testing "by adjustment"
+    (is (= (core/split-expense
+             {:split-method :by-adjustment
+              :amount 100
+              :participants [1 2 3 4]
+              :split-params {1 10, 2 -10}})
+           [35 15 25 25]))))

@@ -13,7 +13,7 @@
    [:date [:re #"\d{4}-\d{2}-\d{2}"]]
    [:participants [:vector {:min 1} [:int {:min 1}]]]
    [:split-method :keyword]
-   [:split-params {:optional true} [:map-of :int :int]]])
+   [:split-params {:optional true} [:map-of :int [:maybe :int]]]])
 
 (defn add-person [db {:keys [name]}]
   (cond
