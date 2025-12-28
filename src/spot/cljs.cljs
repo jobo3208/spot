@@ -75,7 +75,8 @@
 (defn update-split-method [state new-split-method]
   (-> state
       (assoc-in [:ui :expense :data :split-method] new-split-method)
-      (update-in [:ui :expense :data] dissoc :split-params)))
+      (update-in [:ui :expense :data] dissoc :split-params)
+      (update-in [:ui :expense :errors] dissoc :split-params)))
 
 (defn update-participants [state new-participants]
   (-> state
