@@ -17,6 +17,16 @@
       lower-quotas
       give-remaining-to)))
 
+(defn split-valid? [total amounts]
+  (and (every? #(>= % 0) amounts)
+       (= total (reduce + amounts))))
+
+(defn split [total quotas]
+  (let [amounts (apportion total quotas)]
+    (if (split-valid? total amounts)
+      amounts
+      (throw (ex-info "Unable to split." {:amounts amounts})))))
+
 (defmulti split-expense
   "Return split amounts based on :split-method."
   :split-method)
@@ -25,7 +35,7 @@
   [{:keys [amount participants]}]
   (let [n (count participants)
         quotas (repeat n [amount n])]
-    (apportion amount quotas)))
+    (split amount quotas)))
 
 (defmethod split-expense :by-amount
   [{:keys [amount participants split-params]}]
@@ -35,7 +45,7 @@
         remainder (- amount (reduce + (filter some? split-amounts)))
         unpopulated-quota [remainder num-unpopulated]
         quotas (mapv #(if (some? %) [% 1] unpopulated-quota) split-amounts)]
-    (apportion amount quotas)))
+    (split amount quotas)))
 
 (defmethod split-expense :by-percentage
   [{:keys [amount participants split-params]}]
@@ -46,7 +56,7 @@
         split-percentages (mapv #(if (some? %) [% 1] unpopulated-percentage) split-percentages)
         proportions (map #(rdiv % 100) split-percentages)
         quotas (map (partial rmult amount) proportions)]
-    (apportion amount quotas)))
+    (split amount quotas)))
 
 (defmethod split-expense :by-shares
   [{:keys [amount participants split-params]}]
@@ -54,7 +64,7 @@
         total-shares (reduce + split-shares)
         proportions (map #(rdiv % total-shares) split-shares)
         quotas (map (partial rmult amount) proportions)]
-    (apportion amount quotas)))
+    (split amount quotas)))
 
 (defmethod split-expense :by-adjustment
   [{:keys [amount participants split-params] :as expense}]
@@ -62,7 +72,7 @@
         amount-to-divide (- amount (reduce + split-adjustments))
         amounts (split-expense (assoc expense :amount amount-to-divide :split-method :equally))
         quotas (map radd amounts split-adjustments)]
-    (apportion amount quotas)))
+    (split amount quotas)))
 
 (defn expense->loans
   [{:keys [payer id participants] :as expense}]

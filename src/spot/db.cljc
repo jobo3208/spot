@@ -1,6 +1,7 @@
 (ns spot.db
   (:require [malli.core :as m]
-            [malli.transform :as mt]))
+            [malli.transform :as mt]
+            [spot.core :as core]))
 
 (def init-db {:next-ids {:people 1 :expenses 1}})
 
@@ -42,6 +43,7 @@
 
 (defn save-expense [db expense]
   (let [expense (m/coerce Expense expense mt/string-transformer)
+        _       (core/split-expense expense)  ; ensure splittable
         new?    (nil? (:id expense))
         next-id (get-in db [:next-ids :expenses])
         id      (if new? next-id (:id expense))
