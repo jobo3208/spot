@@ -1,6 +1,5 @@
 (ns spot.cljs
   (:require [clojure.string :as string]
-            [malli.error :as me]
             [reagent.core :as r]
             [reagent.dom.client :as rdomc]
             [spot.core :as core]
@@ -64,10 +63,7 @@
         (update :db db/save-expense expense)
         (update :ui dissoc :expense))
     (catch ExceptionInfo e
-      ; TODO: more standardized errors
-      (if (= (:type (ex-data e)) :malli.core/coercion)
-        (assoc-in state [:ui :expense :errors] (-> e ex-data :data :explain me/humanize))
-        (assoc-in state [:ui :expense :errors :split-params :group] ["Invalid split parameters."])))))
+      (assoc-in state [:ui :expense :errors] (ex-data e)))))
 
 (defn cancel-editing-expense [state]
   (update state :ui dissoc :expense))
@@ -186,7 +182,7 @@
 (defmethod edit-expense-split-method-params :default
   [*state {:keys [data errors]}]
   (let [{:keys [db]} @*state
-        group-errors (get-in errors [:split-params :group])]
+        *-errors (get-in errors [:split-params :*])]
     [:div.mb-2
      (for [id (:participants data)]
        (let [data (get-in data [:split-params id])
@@ -196,16 +192,16 @@
           [:div.col-sm-10
            [:input.form-control
             {:type :text
-             :class (cond-> [] (or errors group-errors) (conj :is-invalid))
+             :class (cond-> [] (or errors *-errors) (conj :is-invalid))
              :on-change #(swap! *state assoc-in [:ui :expense :data :split-params id] (-> % .-target .-value))
              :value data}]
            (when errors
              [:div.invalid-feedback (first errors)])]]))
      [:input
       {:type :hidden
-       :class (cond-> [] group-errors (conj :is-invalid))}]
-     (when group-errors
-       [:div.invalid-feedback (first group-errors)])]))
+       :class (cond-> [] *-errors (conj :is-invalid))}]
+     (when *-errors
+       [:div.invalid-feedback (first *-errors)])]))
 
 (defn edit-expense-card [*state]
   (let [{:keys [db ui]} @*state

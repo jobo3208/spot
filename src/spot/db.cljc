@@ -1,5 +1,6 @@
 (ns spot.db
   (:require [malli.core :as m]
+            [malli.error :as me]
             [malli.transform :as mt]
             [spot.core :as core]))
 
@@ -49,9 +50,19 @@
     :else
     (update db :people dissoc id)))
 
-(defn save-expense [db expense]
-  (let [expense (m/coerce Expense expense string-transformer)
-        _       (core/split-expense expense)  ; ensure splittable
+(defn save-expense
+  "Save a new or existing expense. If expense is invalid, raise
+  ExceptionInfo, where data is a (possibly nested) map where the keys
+  are problematic fields and the values are vectors of error messages."
+  [db expense]
+  (let [expense (try
+                  (m/coerce Expense expense string-transformer)
+                  (catch ExceptionInfo e
+                    (throw (ex-info "Expense violates schema." (-> e ex-data :data :explain me/humanize)))))
+        _       (try
+                  (core/split-expense expense)
+                  (catch ExceptionInfo _
+                    (throw (ex-info "Invalid split params." {:split-params {:* ["Invalid split params."]}}))))
         new?    (nil? (:id expense))
         next-id (get-in db [:next-ids :expenses])
         id      (if new? next-id (:id expense))
