@@ -60,7 +60,7 @@
 
 (defmethod split-expense :by-shares
   [{:keys [amount participants split-params]}]
-  (let [split-shares (mapv #(get split-params % 1) participants)
+  (let [split-shares (mapv #(or (get split-params %) 1) participants)
         total-shares (reduce + split-shares)
         proportions (map #(rdiv % total-shares) split-shares)
         quotas (map (partial rmult amount) proportions)]
@@ -68,7 +68,7 @@
 
 (defmethod split-expense :by-adjustment
   [{:keys [amount participants split-params] :as expense}]
-  (let [split-adjustments (mapv #(get split-params % 0) participants)
+  (let [split-adjustments (mapv #(or (get split-params %) 0) participants)
         amount-to-divide (- amount (reduce + split-adjustments))
         amounts (split-expense (assoc expense :amount amount-to-divide :split-method :equally))
         quotas (map radd amounts split-adjustments)]

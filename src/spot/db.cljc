@@ -5,6 +5,14 @@
 
 (def init-db {:next-ids {:people 1 :expenses 1}})
 
+(def string-transformer
+  ; treat empty string as nil in maybe contexts
+  (mt/transformer
+   (mt/transformer
+    {:name :maybe
+     :decoders {:maybe #(if (= "" %) nil %)}})
+   (mt/string-transformer)))
+
 (def Expense
   [:map
    [:id {:optional true} :int]
@@ -42,7 +50,7 @@
     (update db :people dissoc id)))
 
 (defn save-expense [db expense]
-  (let [expense (m/coerce Expense expense mt/string-transformer)
+  (let [expense (m/coerce Expense expense string-transformer)
         _       (core/split-expense expense)  ; ensure splittable
         new?    (nil? (:id expense))
         next-id (get-in db [:next-ids :expenses])
