@@ -1,5 +1,8 @@
 (ns spot.cljs
   (:require [clojure.string :as string]
+            [malli.core :as m]
+            [malli.error :as me]
+            [malli.transform :as mt]
             [reagent.core :as r]
             [reagent.dom.client :as rdomc]
             [spot.core :as core]
@@ -11,8 +14,52 @@
       (str (apply str (repeat (- len (count s)) "0")) s)
       s)))
 
-(defn format-amount [amount]
-  (str "$" (zpad (quot amount 100) 1) "." (zpad (mod (abs amount) 100) 2)))
+(defn format-amount
+  ([amount]
+   (format-amount amount false))
+  ([amount dollar-sign?]
+   (str
+     (when dollar-sign? "$")
+     (zpad (quot amount 100) 1)
+     "."
+     (zpad (mod (abs amount) 100) 2))))
+
+(defn parse-amount [s]
+  (let [s (string/replace s #"[$,]" "")]
+    (cond
+      (re-matches #"^-?\d+\.\d\d$" s) (js/parseInt (string/replace s #"[^0-9-]" ""))
+      (re-matches #"^-?\d+$" s) (js/parseInt (str s "00"))
+      :else (throw (ex-info "Invalid amount." {:amount s})))))
+
+(def dollars-cents-transformer
+  "For money values, transform b/w frontend (string with dollars and
+  optional cents) and backend (integer cents)."
+  (mt/transformer
+   {:name :dollars-cents
+    :decoders
+    {:int
+     {:compile (fn [schema _]
+                 (if (= :money (:type (m/properties schema)))
+                   (fn [x]
+                     (if (string? x)
+                       (try
+                         (parse-amount x)
+                         (catch ExceptionInfo _
+                           x))
+                       x))
+                   identity))}}
+    :encoders
+    {:int
+     {:compile (fn [schema _]
+                 (if (= :money (:type (m/properties schema)))
+                   format-amount
+                   identity))}}}))
+
+(def empty-string-nil-transformer
+  "Decode empty string to nil for maybe values."
+ (mt/transformer
+  {:name :empty-string-nil
+   :decoders {:maybe #(if (= "" %) nil %)}}))
 
 (defn format-split-method [split-method]
   (string/replace (name split-method) #"-" " "))
@@ -53,15 +100,23 @@
 (defn edit-expense [state id]
   (if (nil? (get-in state [:ui :expense]))
     (if-let [expense (get-in state [:db :expenses id])]
-      (assoc-in state [:ui :expense :data] expense)
+      (assoc-in state [:ui :expense :data] (m/encode (db/get-expense-schema expense) expense dollars-cents-transformer))
       (throw (ex-info "Expense does not exist." {})))
     (throw (ex-info "Cannot edit expense right now." {}))))
 
 (defn save-expense [state expense]
   (try
-    (-> state
-        (update :db db/save-expense expense)
-        (update :ui dissoc :expense))
+    (let [transformer (mt/transformer
+                        dollars-cents-transformer
+                        empty-string-nil-transformer
+                        mt/string-transformer)
+          expense (try
+                    (m/coerce (db/get-expense-schema expense) expense transformer)
+                    (catch ExceptionInfo e
+                      (throw (ex-info "Expense violates schema." (-> e ex-data :data :explain me/humanize)))))]
+      (-> state
+          (update :db db/save-expense expense)
+          (update :ui dissoc :expense)))
     (catch ExceptionInfo e
       (assoc-in state [:ui :expense :errors] (ex-data e)))))
 

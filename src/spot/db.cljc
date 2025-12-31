@@ -1,29 +1,53 @@
 (ns spot.db
   (:require [malli.core :as m]
             [malli.error :as me]
-            [malli.transform :as mt]
+            [malli.util :as mu]
             [spot.core :as core]))
 
 (def init-db {:next-ids {:people 1 :expenses 1}})
-
-(def string-transformer
-  ; treat empty string as nil in maybe contexts
-  (mt/transformer
-   (mt/transformer
-    {:name :maybe
-     :decoders {:maybe #(if (= "" %) nil %)}})
-   (mt/string-transformer)))
 
 (def Expense
   [:map
    [:id {:optional true} :int]
    [:description [:string {:min 1}]]
-   [:amount [:int {:min 1}]]
+   [:amount [:int {:type :money :min 1}]]
    [:payer [:int {:min 1}]]
    [:date [:re #"\d{4}-\d{2}-\d{2}"]]
    [:participants [:vector {:min 1} [:int {:min 1}]]]
-   [:split-method :keyword]
-   [:split-params {:optional true} [:map-of :int [:maybe :int]]]])
+   [:split-method :keyword]])
+
+(defmulti get-split-params-schema identity)
+
+(defmethod get-split-params-schema :equally
+  [_]
+  nil)
+
+(defmethod get-split-params-schema :by-amount
+  [_]
+  [:map-of :int [:maybe [:int {:type :money :min 0}]]])
+
+(defmethod get-split-params-schema :by-percentage
+  [_]
+  [:map-of :int [:maybe [:int {:min 0 :max 100}]]])
+
+(defmethod get-split-params-schema :by-shares
+  [_]
+  [:map-of :int [:maybe [:int {:min 0}]]])
+
+(defmethod get-split-params-schema :by-adjustment
+  [_]
+  [:map-of :int [:maybe [:int {:type :money}]]])
+
+(defn get-expense-schema
+  "Return a schema that can be used to validate this expense. This
+  feels a bit hacky but allows full polymorphism on split-method."
+  [{:keys [split-method]}]
+  (let [split-method (if (string? split-method) (name split-method) split-method)]
+    (if-let [schema (get-split-params-schema split-method)]
+      (mu/assoc Expense :split-params schema)
+      Expense)))
+
+(get-expense-schema {:split-method :equally})
 
 (defn add-person [db {:keys [name]}]
   (cond
@@ -55,8 +79,9 @@
   ExceptionInfo, where data is a (possibly nested) map where the keys
   are problematic fields and the values are vectors of error messages."
   [db expense]
-  (let [expense (try
-                  (m/coerce Expense expense string-transformer)
+  (let [schema (get-expense-schema expense)
+        expense (try
+                  (m/coerce schema expense)
                   (catch ExceptionInfo e
                     (throw (ex-info "Expense violates schema." (-> e ex-data :data :explain me/humanize)))))
         _       (try
