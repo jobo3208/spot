@@ -141,18 +141,19 @@
   (let [{:keys [db]} @*state
         expenses (vals (:expenses db))
         debts (core/expenses->debts expenses)]
-    [:div.card.mt-3.mb-3
-     [:div.card-header
-      [:h5.card-title "Summary"]]
-     [:div.card-body
-      [:ul
-       (for [[[ower owed] amount] debts]
-         [:li
-          [:strong (get-in db [:people ower :name])]
-          " owes "
-          [:strong (get-in db [:people owed :name])]
-          " "
-          [:strong (format-amount amount)]])]]]))
+    (when (seq expenses)
+      [:div.card.mt-3.mb-3
+       [:div.card-header
+        [:h5.card-title "Summary"]]
+       [:div.card-body
+        [:ul
+         (for [[[ower owed] amount] debts]
+           [:li
+            [:strong (get-in db [:people ower :name])]
+            " owes "
+            [:strong (get-in db [:people owed :name])]
+            " "
+            [:strong (format-amount amount)]])]]])))
 
 (defn people-card [*state]
   (let [{:keys [db ui]} @*state]
@@ -340,21 +341,22 @@
 (defn expenses-card [*state]
   (let [{:keys [db ui]} @*state
         editing-expense (get-in ui [:expense :data])]
-    [:div.card.mb-3
-     [:div.card-header
-      [:h5.card-title "Expenses"]]
-     [:div.card-body
-      (when (not editing-expense)
-        [:button.btn.btn-outline-primary.mb-3
-         {:on-click #(swap! *state add-new-expense)}
-         "Add new expense"])
-      (when (and editing-expense (nil? (:id editing-expense)))
-        (edit-expense-card *state))
-      (interpose [:div.mb-3]
-       (for [[id expense] (reverse (sort-by first (:expenses db)))]
-         (if (= id (:id editing-expense))
-           (edit-expense-card *state)
-           (expense-card *state expense))))]]))
+    (when (seq (vals (:people db)))
+      [:div.card.mb-3
+       [:div.card-header
+        [:h5.card-title "Expenses"]]
+       [:div.card-body
+        (when (not editing-expense)
+          [:button.btn.btn-outline-primary.mb-3
+           {:on-click #(swap! *state add-new-expense)}
+           "Add new expense"])
+        (when (and editing-expense (nil? (:id editing-expense)))
+          (edit-expense-card *state))
+        (interpose [:div.mb-3]
+         (for [[id expense] (reverse (sort-by first (:expenses db)))]
+           (if (= id (:id editing-expense))
+             (edit-expense-card *state)
+             (expense-card *state expense))))]])))
 
 (defn alert [*state]
   [:<>
