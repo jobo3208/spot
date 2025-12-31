@@ -153,7 +153,7 @@
             " owes "
             [:strong (get-in db [:people owed :name])]
             " "
-            [:strong (format-amount amount)]])]]])))
+            [:strong (format-amount amount true)]])]]])))
 
 (defn people-card [*state]
   (let [{:keys [db ui]} @*state]
@@ -195,7 +195,7 @@
        [:dt.col-sm-3 "Description"]
        [:dd.col-sm-9 (:description expense)]
        [:dt.col-sm-3 "Amount"]
-       [:dd.col-sm-9 (format-amount (:amount expense))]
+       [:dd.col-sm-9 (format-amount (:amount expense) true)]
        [:dt.col-sm-3 "Date"]
        [:dd.col-sm-9 (:date expense)]
        [:dt.col-sm-3 "Paid by"]
@@ -214,7 +214,7 @@
           " owes "
           [:strong (get-in db [:people owed :name])]
           " "
-          [:strong (format-amount amount)]])]
+          [:strong (format-amount amount true)]])]
       (when-not editing-expense
         [:div.text-end
          [:button.btn.btn-sm.btn-outline-danger
