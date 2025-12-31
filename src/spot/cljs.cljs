@@ -1,5 +1,6 @@
 (ns spot.cljs
   (:require [clojure.string :as string]
+            [clojure.walk :as walk]
             [malli.core :as m]
             [malli.error :as me]
             [malli.transform :as mt]
@@ -55,11 +56,16 @@
                    format-amount
                    identity))}}}))
 
-(def empty-string-nil-transformer
-  "Decode empty string to nil for maybe values."
- (mt/transformer
-  {:name :empty-string-nil
-   :decoders {:maybe #(if (= "" %) nil %)}}))
+(defn strip-unpopulated
+  "Recursively remove kvs where val is the empty string or nil. Useful
+  for getting back a 'missing' error instead of a 'wrong type' error."
+  [data]
+  (walk/postwalk
+    (fn [x]
+      (if (map? x)
+        (into {} (remove (fn [[_ v]] (or (nil? v) (= "" v))) x))
+        x))
+    data))
 
 (defn format-split-method [split-method]
   (string/replace (name split-method) #"-" " "))
@@ -106,9 +112,9 @@
 
 (defn save-expense [state expense]
   (try
-    (let [transformer (mt/transformer
+    (let [expense (strip-unpopulated expense)
+          transformer (mt/transformer
                         dollars-cents-transformer
-                        empty-string-nil-transformer
                         mt/string-transformer)
           expense (try
                     (m/coerce (db/get-expense-schema expense) expense transformer)
