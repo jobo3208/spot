@@ -154,6 +154,7 @@
        [:div.card-body
         [:ul
          (for [[[ower owed] amount] debts]
+           ^{:key [ower owed]}
            [:li
             [:strong (get-in db [:people ower :name])]
             " owes "
@@ -169,8 +170,8 @@
      [:div.card-body
       [:ul.list-inline
        (for [[id person] (sort (:people db))]
+         ^{:key id}
          [:li.list-inline-item
-          {:data-id id}
           (:name person)
           " "
           [:button.btn.btn-sm.p-0
@@ -215,6 +216,7 @@
        [:dd.col-sm-9 (format-split-method (:split-method expense))]]
       [:ul
        (for [[[ower owed] amount] debts]
+         ^{:key [ower owed]}
          [:li
           [:strong (get-in db [:people ower :name])]
           " owes "
@@ -249,6 +251,7 @@
      (for [id (:participants data)]
        (let [data (get-in data [:split-params id])
              errors (get-in errors [:split-params id])]
+         ^{:key id}
          [:div.row.mb-1
           [:label.col-sm-2.col-form-label (get-in db [:people id :name])]
           [:div.col-sm-10
@@ -306,6 +309,7 @@
          :on-change #(swap! *state assoc-in [:ui :expense :data :payer] (-> % .-target .-value to-int))}
         [:option "-"]
         (for [[id person] (sort (:people db))]
+          ^{:key id}
           [:option
            {:value id
             :selected (= (:payer data) id)}
@@ -319,6 +323,7 @@
          :class (cond-> [] (:participants errors) (conj :is-invalid))
          :on-change #(swap! *state update-participants (mapv to-int (vals-from-multi-select (.-target %))))}
         (for [[id person] (sort (:people db))]
+          ^{:key id}
           [:option
            {:value id
             :selected (contains? (set (:participants data)) id)}
@@ -330,11 +335,12 @@
        [:select.form-control
         {:on-change #(swap! *state update-split-method (-> % .-target .-value keyword))}
         (for [method (sort (keys (methods core/split-expense)))]
+          ^{:key method}
           [:option
            {:value method
             :selected (= method (:split-method data))}
            (format-split-method method)])]]
-      (edit-expense-split-method-params *state (:expense ui))
+      [edit-expense-split-method-params *state (:expense ui)]
       [:div.card-footer.text-end
        [:button.btn.btn-outline-secondary
         {:on-click #(swap! *state cancel-editing-expense)}
@@ -357,12 +363,13 @@
            {:on-click #(swap! *state add-new-expense)}
            "Add new expense"])
         (when (and editing-expense (nil? (:id editing-expense)))
-          (edit-expense-card *state))
-        (interpose [:div.mb-3]
-         (for [[id expense] (reverse (sort-by first (:expenses db)))]
-           (if (= id (:id editing-expense))
-             (edit-expense-card *state)
-             (expense-card *state expense))))]])))
+          [edit-expense-card *state])
+        (doall
+          (interpose [:div.mb-3]
+           (for [[id expense] (reverse (sort-by first (:expenses db)))]
+             (if (= id (:id editing-expense))
+               ^{:key id} [edit-expense-card *state]
+               ^{:key id} [expense-card *state expense]))))]])))
 
 (defn alert [*state]
   [:<>
@@ -373,9 +380,9 @@
 (defn container [*state]
   [:div.container
    [alert *state]
-   (summary-card *state)
-   (people-card *state)
-   (expenses-card *state)])
+   [summary-card *state]
+   [people-card *state]
+   [expenses-card *state]])
 
 (defonce root (rdomc/create-root (.getElementById js/document "root")))
 
