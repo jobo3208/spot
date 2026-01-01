@@ -44,10 +44,10 @@
   [{:keys [split-method]}]
   (let [split-method (if (string? split-method) (name split-method) split-method)]
     (if-let [schema (get-split-params-schema split-method)]
-      (mu/assoc Expense :split-params schema)
+      (-> Expense
+          (mu/assoc :split-params schema)
+          (mu/optional-keys [:split-params]))
       Expense)))
-
-(get-expense-schema {:split-method :equally})
 
 (defn add-person [db {:keys [name]}]
   (cond
