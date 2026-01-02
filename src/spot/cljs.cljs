@@ -57,13 +57,13 @@
                    identity))}}}))
 
 (defn strip-unpopulated
-  "Recursively remove kvs where val is the empty string or nil. Useful
-  for getting back a 'missing' error instead of a 'wrong type' error."
+  "Recursively remove kvs where val is empty or nil. Useful for getting
+  back a 'missing' error instead of a 'wrong type' error."
   [data]
   (walk/postwalk
     (fn [x]
       (if (map? x)
-        (into {} (remove (fn [[_ v]] (or (nil? v) (= "" v))) x))
+        (into {} (remove (fn [[_ v]] (or (nil? v) (and (seqable? v) (empty? v)))) x))
         x))
     data))
 
