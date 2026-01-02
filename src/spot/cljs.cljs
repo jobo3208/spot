@@ -110,6 +110,18 @@
       (throw (ex-info "Expense does not exist." {})))
     (throw (ex-info "Cannot edit expense right now." {}))))
 
+(defn adapt-errors
+  "Clumsily adapt error messages for our frontend."
+  [error-data]
+  (walk/postwalk
+    (fn [x]
+      (if (string? x)
+        (case x
+          "missing required key" "This field is required."
+          "Invalid value.")
+        x))
+    error-data))
+
 (defn save-expense [state expense]
   (try
     (let [schema      (db/get-expense-schema expense)
@@ -119,7 +131,7 @@
           (update :db db/save-expense expense)
           (update :ui dissoc :expense)))
     (catch ExceptionInfo e
-      (assoc-in state [:ui :expense :errors] (ex-data e)))))
+      (assoc-in state [:ui :expense :errors] (adapt-errors (ex-data e))))))
 
 (defn cancel-editing-expense [state]
   (update state :ui dissoc :expense))
