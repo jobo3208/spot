@@ -112,14 +112,9 @@
 
 (defn save-expense [state expense]
   (try
-    (let [expense (strip-unpopulated expense)
-          transformer (mt/transformer
-                        dollars-cents-transformer
-                        mt/string-transformer)
-          expense (try
-                    (m/coerce (db/get-expense-schema expense) expense transformer)
-                    (catch ExceptionInfo e
-                      (throw (ex-info "Expense violates schema." (-> e ex-data :data :explain me/humanize)))))]
+    (let [schema      (db/get-expense-schema expense)
+          transformer (mt/transformer dollars-cents-transformer mt/string-transformer)
+          expense     (m/decode schema (strip-unpopulated expense) transformer)]
       (-> state
           (update :db db/save-expense expense)
           (update :ui dissoc :expense)))
