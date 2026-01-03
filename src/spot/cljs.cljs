@@ -1,5 +1,6 @@
 (ns spot.cljs
-  (:require [clojure.string :as string]
+  (:require [clojure.edn :as edn]
+            [clojure.string :as string]
             [clojure.walk :as walk]
             [malli.core :as m]
             [malli.error :as me]
@@ -396,4 +397,11 @@
 (defonce *state (r/atom {:db db/init-db :ui {}}))
 
 (defn init []
+  (when-let [db (.getItem js/localStorage "spot.db")]
+    (swap! *state assoc :db (edn/read-string db)))
+  (add-watch
+    *state
+    :local-storage
+    (fn [_ _ _ n]
+      (.setItem js/localStorage "spot.db" (str (:db n)))))
   (rdomc/render root [container *state]))
